@@ -1,0 +1,303 @@
+name: dci-usecase-DC1
+prefix: ""
+
+mgmt:
+    network: dci-usecase-DC1-lab
+    ipv4-subnet: 172.20.40.0/24
+
+topology:
+  kinds:
+    srl:
+      image: ghcr.io/nokia/srlinux:23.10.2
+    linux:
+      image: ghcr.io/hellt/network-multitool
+    vr-sros:
+      image: vr-sros:23.2.R2
+      # image: registry.srlinux.dev/pub/vr-sros:23.7.R1
+      type: sr-1s
+      license: SR_OS_VSR-SIM_R23_EMEA_Regional_NPI_license - EXP-2024-09-21.txt
+  nodes:
+    br-dc1-d1-s1:
+      kind: bridge
+    br-dc1-d1-s2:
+      kind: bridge
+    br-dc1-d2-s1:
+      kind: bridge
+    br-dc1-d2-s2:
+      kind: bridge
+    br-dc2-d1-s1:
+      kind: bridge
+    br-dc2-d1-s2:
+      kind: bridge
+    br-dc2-d2-s1:
+      kind: bridge
+    br-dc2-d2-s2:
+      kind: bridge
+    dc1-l1:
+      kind: srl
+      type: ixrd2l
+      mgmt-ipv4: 172.20.40.11
+      labels:
+        role: leaf
+        fabric: yes
+
+    dc1-l2:
+      kind: srl
+      type: ixrd2l
+      mgmt-ipv4: 172.20.40.12
+      labels:
+        role: leaf
+        fabric: yes
+
+    dc1-l3:
+      kind: srl
+      type: ixrd2
+      mgmt-ipv4: 172.20.40.13
+      labels:
+        role: leaf
+        fabric: yes
+
+    dc1-l4:
+      kind: srl
+      type: ixrd2
+      mgmt-ipv4: 172.20.40.14
+      labels:
+        role: leaf
+        fabric: yes
+    dc1-s1:
+      kind: srl
+      type: ixrd3
+      mgmt-ipv4: 172.20.40.101
+      labels:
+        role: spine
+        fabric: yes
+    dc1-s2:
+      kind: srl
+      type: ixrd3
+      mgmt-ipv4: 172.20.40.102
+      labels:
+        role: spine
+        fabric: yes
+    
+    #DC2
+    dc2-l1:
+      kind: srl
+      type: ixrd2l
+      mgmt-ipv4: 172.20.40.15
+      labels:
+        role: leaf
+        fabric: yes
+    dc2-l2:
+      kind: srl
+      type: ixrd2l
+      mgmt-ipv4: 172.20.40.16
+      labels:
+        role: leaf
+        fabric: yes
+    dc2-l3:
+      kind: srl
+      type: ixrd2
+      mgmt-ipv4: 172.20.40.17
+      labels:
+        role: leaf
+        fabric: yes
+    dc2-l4:
+      kind: srl
+      type: ixrd2
+      mgmt-ipv4: 172.20.40.18
+      labels:
+        role: leaf
+        fabric: yes
+    dc2-s1:
+      kind: srl
+      type: ixrd3
+      mgmt-ipv4: 172.20.40.19
+      labels:
+        role: spine
+        fabric: yes
+    dc2-s2:
+      kind: srl
+      type: ixrd3
+      mgmt-ipv4: 172.20.40.20
+      labels:
+        role: spine
+        fabric: yes
+    
+    #WAN
+    dc1-d1:
+      kind: vr-sros
+      mgmt-ipv4: 172.20.40.21
+      labels:
+        role: dcgw
+        fabric: yes
+      startup-config: dc1-d1.partial.txt
+    dc1-d2:
+      kind: vr-sros
+      mgmt-ipv4: 172.20.40.22
+      labels:
+        role: dcgw
+        fabric: yes
+      startup-config: dc1-d2.partial.txt
+    dc2-d1:
+      kind: vr-sros
+      mgmt-ipv4: 172.20.40.31
+      labels:
+        role: dcgw
+        fabric: yes
+      startup-config: dc2-d1.partial.txt
+    dc2-d2:
+      kind: vr-sros
+      mgmt-ipv4: 172.20.40.32
+      labels:
+        role: dcgw
+        fabric: yes
+      startup-config: dc2-d2.partial.txt
+
+    dc-d1:
+      kind: vr-sros
+      mgmt-ipv4: 172.20.40.33
+      labels:
+        role: dcgw
+        fabric: yes
+      startup-config: dc2-d1.partial.txt
+    dc-d2:
+      kind: vr-sros
+      mgmt-ipv4: 172.20.40.34
+      labels:
+        role: dcgw
+        fabric: yes
+      startup-config: dc2-d2.partial.txt
+    #Clients
+    dc1-cl121:
+      kind: linux
+      mgmt-ipv4: 172.20.40.133
+      binds:
+        - "/root/dci-usecase-main/scripts:/scripts:ro"
+      exec:
+        - apt-get update
+        - apt-get install -y stress
+        - ip link add bond0 type bond mode 802.3ad
+        - ip link set addr 00:c1:ab:01:01:21 dev bond0
+        - ip link add link bond0 name bond0.201 type vlan id 201
+        - ip link set eth1 down
+        - ip link set eth2 down
+        - ip link set eth1 master bond0
+        - ip link set eth2 master bond0
+        - ip link set eth1 up
+        - ip link set eth2 up
+        - ip link set bond0 up
+        - ip addr add 10.20.1.1/24 dev bond0.201
+        - ip route add 10.20.2.0/24 via 10.20.1.254 dev bond0.201
+        - iperf3 -s -D
+        - /scripts/iperf3clientloop.sh --background -c 10.20.2.1 --udp --bitrate 100K --parallel 10 --time 86400
+    
+    dc2-cl121:
+      kind: linux
+      mgmt-ipv4: 172.20.40.134
+      binds:
+        - scripts:/scripts:ro
+      exec:
+        - ip link add bond0 type bond mode 802.3ad
+        - ip link set addr 00:c1:ab:02:01:21 dev bond0
+        - ip link add link bond0 name bond0.202 type vlan id 202
+        - ip link set eth1 down
+        - ip link set eth2 down
+        - ip link set eth1 master bond0
+        - ip link set eth2 master bond0
+        - ip link set eth1 up
+        - ip link set eth2 up
+        - ip link set bond0 up
+        - ip addr add 10.20.2.1/24 dev bond0.202
+        - ip route add 10.20.1.0/24 via 10.20.2.254 dev bond0.202
+        - iperf3 -s -D
+        - /scripts/iperf3clientloop.sh --background -c 10.20.1.1 --udp --bitrate 100K --parallel 10 --time 86400
+
+
+
+    gnmic:
+      kind: linux
+      mgmt-ipv4: 172.20.40.46
+      image: ghcr.io/openconfig/gnmic:0.30.0
+      binds:
+        - gnmic-config.yml:/gnmic-config.yml:ro
+      cmd: --config /gnmic-config.yml --log subscribe
+      group: "10"
+
+    grafana:
+        kind: linux
+        mgmt-ipv4: 172.20.40.44
+        image: grafana/grafana:9.5.2
+        binds:
+          - configs/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yaml:ro
+          - configs/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+          - configs/grafana/dashboards:/var/lib/grafana/dashboards
+        ports:
+          - 3000:3000
+        env:
+          GF_INSTALL_PLUGINS: https://algenty.github.io/flowcharting-repository/archives/agenty-flowcharting-panel-1.0.0d.220606199-SNAPSHOT.zip;agenty-flowcharting-panel    
+        group: "10"
+        
+    prometheus:
+      kind: linux
+      mgmt-ipv4: 172.20.40.45
+      image: prom/prometheus:v2.37.8
+      binds:
+        - configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      cmd: --config.file=/etc/prometheus/prometheus.yml
+      ports:
+        - 9090:9090
+      group: "10"
+
+
+  links:
+    - endpoints: ["dc1-s1:e1-33", "br-dc1-d1-s1:dc1s1-e1-33"]
+    - endpoints: ["dc1-s1:e1-34", "br-dc1-d2-s1:dc1s1-e1-34"]
+    - endpoints: ["dc1-s2:e1-33", "br-dc1-d1-s2:dc1s2-e1-33"]
+    - endpoints: ["dc1-s2:e1-34", "br-dc1-d2-s2:dc1s2-e1-34"]
+    - endpoints: ["dc1-l1:e1-49", "dc1-s1:e1-3"]
+    - endpoints: ["dc1-l1:e1-50", "dc1-s2:e1-3"]
+    - endpoints: ["dc1-l2:e1-49", "dc1-s1:e1-4"]
+    - endpoints: ["dc1-l2:e1-50", "dc1-s2:e1-4"]
+    - endpoints: ["dc1-l3:e1-49", "dc1-s1:e1-5"]
+    - endpoints: ["dc1-l3:e1-50", "dc1-s2:e1-5"]
+    - endpoints: ["dc1-l4:e1-49", "dc1-s1:e1-6"]
+    - endpoints: ["dc1-l4:e1-50", "dc1-s2:e1-6"]
+    - endpoints: ["dc1-cl121:eth1", "dc1-l1:e1-1"]
+    - endpoints: ["dc1-cl121:eth2", "dc1-l2:e1-1"]
+
+    - endpoints: ["dc2-s1:e1-33", "br-dc2-d1-s1:dc2s1-e1-33"]
+    - endpoints: ["dc2-s1:e1-34", "br-dc2-d2-s1:dc2s1-e1-34"]
+    - endpoints: ["dc2-s2:e1-33", "br-dc2-d1-s2:dc2s2-e1-33"]
+    - endpoints: ["dc2-s2:e1-34", "br-dc2-d2-s2:dc2s2-e1-34"]
+    - endpoints: ["dc2-l1:e1-49", "dc2-s1:e1-3"]
+    - endpoints: ["dc2-l1:e1-50", "dc2-s2:e1-3"]
+    - endpoints: ["dc2-l2:e1-49", "dc2-s1:e1-4"]
+    - endpoints: ["dc2-l2:e1-50", "dc2-s2:e1-4"]
+    - endpoints: ["dc2-l3:e1-49", "dc2-s1:e1-5"]
+    - endpoints: ["dc2-l3:e1-50", "dc2-s2:e1-5"]
+    - endpoints: ["dc2-l4:e1-49", "dc2-s1:e1-6"]
+    - endpoints: ["dc2-l4:e1-50", "dc2-s2:e1-6"]
+    - endpoints: ["dc2-cl121:eth1", "dc2-l1:e1-2"]
+    - endpoints: ["dc2-cl121:eth2", "dc2-l2:e1-2"]
+
+
+    - endpoints: ["dc-d1:eth1", "dc1-d1:eth1"]
+    - endpoints: ["dc-d1:eth2", "br-dc1-d1-s1:dc1d1-e1"]
+    - endpoints: ["dc1-d1:eth2", "br-dc1-d1-s2:dc1d1-e2"]
+    - endpoints: ["dc-d1:eth3", "dc1-d2:eth1"]
+    - endpoints: ["dc-d1:eth4", "br-dc1-d2-s1:dc1d2-e1"]
+    - endpoints: ["dc1-d2:eth2", "br-dc1-d2-s2:dc1d2-e2"]
+    - endpoints: ["dc-d2:eth1", "dc2-d1:eth1"]
+    - endpoints: ["dc-d2:eth2", "br-dc2-d1-s1:dc2d1-e1"]
+    - endpoints: ["dc2-d1:eth2", "br-dc2-d1-s2:dc2d1-e2"]
+    - endpoints: ["dc-d2:eth3", "dc2-d2:eth1"]
+    - endpoints: ["dc-d2:eth4", "br-dc2-d2-s1:dc2d2-e1"]
+    - endpoints: ["dc2-d2:eth2", "br-dc2-d2-s2:dc2d2-e2"]
+    - endpoints: ["dc1-d1:eth6", "dc1-d2:eth6"]
+    - endpoints: ["dc2-d1:eth6", "dc2-d2:eth6"]
+    - endpoints: ["dc1-d1:eth7", "dc2-d1:eth7"]
+    - endpoints: ["dc1-d1:eth8", "dc2-d2:eth7"]
+    - endpoints: ["dc1-d2:eth7", "dc2-d1:eth8"]
+    - endpoints: ["dc1-d2:eth8", "dc2-d2:eth8"]
+
+
